@@ -1,0 +1,27 @@
+{
+  "name": "browser",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.misha.browser",
+    "productName": "BROWSER",
+    "win": {
+      "target": "nsis"
+    }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electron/packager": "^19.1.0",
+    "electron": "^41.0.0",
+    "electron-builder": "^26.8.1"
+  }
+}

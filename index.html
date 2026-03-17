@@ -1,0 +1,867 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>BROWSER</title>
+  <style>
+    :root {
+      --bg-primary: #0d0d0f;
+      --bg-secondary: #161618;
+      --bg-tertiary: #1e1e21;
+      --bg-elevated: #252528;
+      --bg-tab-bar: #0a0a0c;
+      --bg-nav: rgba(18, 18, 20, 0.92);
+      --text-primary: #f0f0f2;
+      --text-secondary: #a0a0a8;
+      --text-muted: #606068;
+      --accent: #6e8eff;
+      --accent-hover: #8da4ff;
+      --accent-glow: rgba(110, 142, 255, 0.25);
+      --accent-subtle: rgba(110, 142, 255, 0.1);
+      --border: rgba(255, 255, 255, 0.05);
+      --border-strong: rgba(255, 255, 255, 0.1);
+      --danger: #ff6b6b;
+      --danger-glow: rgba(255, 107, 107, 0.2);
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --gradient-accent: linear-gradient(135deg, #6e8eff 0%, #a78bfa 100%);
+      --gradient-surface: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+      --radius-xs: 4px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+      --radius-full: 9999px;
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.3);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
+      --shadow-glow: 0 0 20px var(--accent-glow);
+      --transition-fast: 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-normal: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *::-webkit-scrollbar { width: 8px; height: 8px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+    *::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    /* Tab Bar */
+    #tab-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 140px 0 10px; height: 46px;
+      background: var(--bg-tab-bar);
+      border-bottom: 1px solid var(--border);
+      user-select: none; -webkit-app-region: drag; flex-shrink: 0;
+    }
+    #tabs-container {
+      display: flex; align-items: flex-end; height: 100%;
+      overflow-x: auto; scrollbar-width: none; min-width: 0;
+      -webkit-app-region: no-drag; gap: 2px;
+    }
+    #tabs-container::-webkit-scrollbar { display: none; }
+    .drag-region { flex: 1; height: 100%; min-width: 40px; -webkit-app-region: drag; }
+    #new-tab {
+      width: 32px; height: 32px; flex: 0 0 auto;
+      display: inline-flex; align-items: center; justify-content: center; align-self: center;
+      border: none; border-radius: var(--radius-sm); background: transparent;
+      color: var(--text-secondary); cursor: pointer;
+      transition: all var(--transition-fast); -webkit-app-region: no-drag;
+    }
+    #new-tab:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); transform: scale(1.05); }
+    #new-tab:active { transform: scale(0.95); }
+    /* Tabs */
+    .tab {
+      display: flex; align-items: center; gap: 8px;
+      height: 38px; padding: 0 12px; margin-bottom: 0;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      background: transparent;
+      font-size: 12.5px; min-width: 48px; max-width: 240px;
+      cursor: pointer; color: var(--text-secondary);
+      transition: all var(--transition-fast);
+      -webkit-app-region: no-drag; position: relative; flex-shrink: 0;
+      border: 1px solid transparent; border-bottom: none;
+    }
+    .tab::after {
+      content: ''; position: absolute; bottom: 0; left: 50%; width: 0; height: 2px;
+      background: var(--gradient-accent); border-radius: 1px;
+      transform: translateX(-50%); transition: width var(--transition-normal);
+    }
+    .tab.active {
+      background: var(--bg-secondary);
+      color: var(--text-primary); font-weight: 500;
+      border-color: var(--border);
+    }
+    .tab.active::after { width: 60%; }
+    .tab:not(.active):hover {
+      background: rgba(255,255,255,0.04);
+      color: var(--text-primary);
+    }
+    .tab.pinned { min-width: 42px; max-width: 42px; padding: 0; justify-content: center; }
+    .tab.pinned .tab-title, .tab.pinned .tab-close { display: none; }
+    .tab.dragging { opacity: 0.6; transform: scale(0.95); }
+    .tab.drag-over { border-left: 2px solid var(--accent) !important; }
+    .tab .tab-icon-wrap { position: relative; width: 16px; height: 16px; flex-shrink: 0; }
+    .tab .tab-icon { width: 16px; height: 16px; border-radius: var(--radius-xs); object-fit: cover; transition: opacity var(--transition-fast); }
+    .tab .tab-spinner {
+      position: absolute; top: 0; left: 0; width: 16px; height: 16px;
+      border: 2px solid var(--border-strong); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite; display: none;
+    }
+    .tab.loading .tab-icon { opacity: 0; }
+    .tab.loading .tab-spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .tab .tab-title { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+    .tab .tab-audio {
+      width: 14px; height: 14px; flex-shrink: 0; cursor: pointer;
+      color: var(--accent); display: none;
+      transition: all var(--transition-fast);
+    }
+    .tab .tab-audio:hover { color: var(--text-primary); transform: scale(1.1); }
+    .tab.playing-audio .tab-audio { display: flex; }
+    .tab .tab-close {
+      cursor: pointer; width: 20px; height: 20px; border-radius: var(--radius-xs);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); opacity: 0;
+      transition: all var(--transition-fast); flex-shrink: 0;
+    }
+    .tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
+    .tab .tab-close:hover { background: var(--danger-glow); color: var(--danger); }
+    /* Navigation Bar */
+    #nav-bar {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg-nav); padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(16px) saturate(1.2);
+      position: relative; z-index: 100; flex-shrink: 0;
+    }
+    .nav-btn {
+      background: transparent; border: none; color: var(--text-secondary);
+      cursor: pointer; padding: 7px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      transition: all var(--transition-fast); flex-shrink: 0;
+      position: relative;
+    }
+    .nav-btn:hover:not(:disabled) {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-primary);
+    }
+    .nav-btn:active:not(:disabled) { transform: scale(0.92); }
+    .nav-btn:disabled { opacity: 0.25; cursor: default; }
+    .nav-btn svg { width: 18px; height: 18px; }
+    .nav-btn.has-badge::after {
+      content: ''; position: absolute; top: 4px; right: 4px;
+      width: 8px; height: 8px; background: var(--danger);
+      border-radius: 50%; border: 2px solid var(--bg-nav);
+    }
+    /* URL Bar */
+    #url-bar-container {
+      flex: 1; display: flex; min-width: 0;
+      background: var(--bg-primary);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-full); padding: 6px 16px;
+      align-items: center; gap: 10px;
+      transition: all var(--transition-normal);
+      position: relative; overflow: hidden;
+    }
+    #url-bar-container::before {
+      content: ''; position: absolute; inset: 0;
+      background: var(--gradient-surface);
+      opacity: 0; transition: opacity var(--transition-normal);
+      pointer-events: none;
+    }
+    #url-bar-container:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-glow);
+    }
+    #url-bar-container:focus-within::before { opacity: 1; }
+    #ssl-icon { display: flex; align-items: center; flex-shrink: 0; transition: all var(--transition-fast); }
+    #ssl-icon svg { width: 15px; height: 15px; }
+    #ssl-icon.secure svg { color: var(--success); }
+    #ssl-icon.insecure svg { color: var(--warning); }
+    #ssl-icon.danger svg { color: var(--danger); }
+    #ssl-icon.internal svg { color: var(--accent); }
+    #url-input {
+      flex: 1; min-width: 0; background: none; border: none;
+      color: var(--text-primary); font-size: 13.5px; outline: none;
+      font-family: inherit; letter-spacing: 0.01em;
+    }
+    #url-input::placeholder { color: var(--text-muted); }
+    #url-input::selection { background: var(--accent-subtle); }
+    /* Loading Bar */
+    #loading-bar {
+      height: 3px;
+      background: var(--gradient-accent);
+      width: 0%; position: absolute;
+      bottom: 0; left: 0; z-index: 101;
+      border-radius: 0 2px 2px 0;
+      box-shadow: var(--shadow-glow);
+      transition: width 0.3s ease-out;
+    }
+    #loading-bar.hidden { opacity: 0; width: 0% !important; }
+    #loading-bar.complete { width: 100% !important; transition: width 0.15s, opacity 0.3s 0.15s; opacity: 0; }
+    /* Zoom Indicator */
+    #zoom-indicator {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%,-50%) scale(0.8);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      color: var(--text-primary); padding: 16px 32px;
+      border-radius: var(--radius-md);
+      font-size: 18px; font-weight: 600; z-index: 9999;
+      opacity: 0; pointer-events: none;
+      transition: all var(--transition-smooth);
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-lg);
+    }
+    #zoom-indicator.visible { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    /* Bookmarks Bar */
+    #bookmarks-bar {
+      display: flex; gap: 2px; padding: 6px 12px;
+      background: var(--bg-nav); border-bottom: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none; flex-shrink: 0;
+    }
+    #bookmarks-bar::-webkit-scrollbar { display: none; }
+    #bookmarks-bar.hidden { display: none; }
+    .bookmark {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: transparent; border: none; color: var(--text-secondary);
+      font-size: 12px; cursor: pointer; padding: 5px 12px;
+      border-radius: var(--radius-sm); white-space: nowrap;
+      transition: all var(--transition-fast); font-family: inherit;
+    }
+    .bookmark:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+    .bookmark:active { transform: scale(0.97); }
+    .bookmark-icon { width: 14px; height: 14px; border-radius: var(--radius-xs); object-fit: cover; flex-shrink: 0; }
+    /* Find Bar */
+    #find-bar {
+      position: absolute; top: 8px; right: 16px; z-index: 200;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 10px 14px; display: none; align-items: center; gap: 10px;
+      box-shadow: var(--shadow-lg);
+      animation: slideDown 0.2s ease-out;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #find-bar.visible { display: flex; }
+    #find-input {
+      background: var(--bg-primary); border: 1px solid var(--border);
+      color: var(--text-primary); padding: 7px 12px; border-radius: var(--radius-sm);
+      font-size: 13px; outline: none; width: 260px; font-family: inherit;
+      transition: all var(--transition-fast);
+    }
+    #find-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+    #find-count { color: var(--text-muted); font-size: 12px; min-width: 60px; text-align: center; font-weight: 500; }
+    .find-btn {
+      background: transparent; border: none; color: var(--text-secondary);
+      cursor: pointer; padding: 6px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; transition: all var(--transition-fast);
+    }
+    .find-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+    .find-btn:active { transform: scale(0.9); }
+    .find-btn svg { width: 16px; height: 16px; }
+    /* Context Menu */
+    .context-menu {
+      position: fixed; background: rgba(35, 35, 38, 0.85); /* modern acrylic look */
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+      z-index: 10000; padding: 6px; min-width: 240px; display: none;
+      backdrop-filter: blur(24px) saturate(1.2);
+      animation: menuFade 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    @keyframes menuFade {
+      from { opacity: 0; transform: scale(0.95); margin-top: -5px; }
+      to { opacity: 1; transform: scale(1); margin-top: 0; }
+    }
+    .context-menu.visible { display: block; }
+    .ctx-item {
+      padding: 8px 12px; margin: 2px 0; cursor: pointer; display: flex; align-items: center; gap: 12px;
+      font-size: 13.5px; color: var(--text-primary); transition: all 0.1s ease;
+      border-radius: var(--radius-sm);
+    }
+    .ctx-item:hover { background: var(--accent-subtle); color: var(--text-primary); transform: translateX(2px); }
+    .ctx-item .ctx-icon { width: 16px; height: 16px; color: var(--text-secondary); transition: color 0.1s ease; }
+    .ctx-item:hover .ctx-icon { color: var(--accent); }
+    .ctx-item .ctx-shortcut { margin-left: auto; font-size: 11px; color: var(--text-muted); font-weight: 500; }
+    .ctx-divider { height: 1px; background: var(--border-strong); margin: 6px 4px; }
+    /* Browser Menu */
+    #browser-menu {
+      position: absolute; top: 44px; right: 0; width: 280px;
+      background: var(--bg-elevated); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+      z-index: 1000; padding: 6px 0; color: var(--text-primary); font-size: 13px;
+      backdrop-filter: blur(16px);
+    }
+    #browser-menu.hidden { display: none; }
+    .menu-item {
+      padding: 9px 16px; cursor: pointer; display: flex; align-items: center; gap: 12px;
+      user-select: none; transition: all var(--transition-fast);
+    }
+    .menu-item:hover { background: rgba(255,255,255,0.05); }
+    .menu-item:active { background: rgba(255,255,255,0.08); }
+    .menu-icon { font-size: 15px; min-width: 20px; text-align: center; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); }
+    .menu-icon svg { width: 16px; height: 16px; }
+    .menu-shortcut { margin-left: auto; font-size: 11px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.02em; }
+    .menu-divider { height: 1px; background: var(--border); margin: 6px 0; }
+    .menu-zoom-controls { display: flex; align-items: center; gap: 4px; padding: 6px 16px; }
+    .menu-zoom-btn {
+      width: 32px; height: 32px; border: 1px solid var(--border);
+      background: var(--bg-primary); color: var(--text-primary);
+      border-radius: var(--radius-sm); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all var(--transition-fast); font-size: 16px;
+    }
+    .menu-zoom-btn:hover { background: rgba(255,255,255,0.06); border-color: var(--border-strong); }
+    .menu-zoom-btn:active { transform: scale(0.95); }
+    .menu-zoom-level { min-width: 50px; text-align: center; font-size: 13px; font-weight: 500; }
+    /* View Container */
+    #view-container { flex: 1; position: relative; overflow: hidden; }
+    webview, .internal-view { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; }
+    webview.active { display: flex; }
+    .internal-view.active { display: flex; flex-direction: column; }
+    .internal-view { background: var(--bg-primary); color: var(--text-primary); overflow: auto; }
+    /* New Tab Page */
+    .newtab-page {
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      height: 100%;
+      background: 
+        radial-gradient(ellipse at 30% 20%, rgba(110, 142, 255, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 60%, rgba(167, 139, 250, 0.06) 0%, transparent 50%),
+        var(--bg-primary);
+      padding: 60px 40px; gap: 48px; overflow: auto;
+    }
+    .newtab-header { text-align: center; }
+    .newtab-greeting {
+      font-size: 32px; font-weight: 300; color: var(--text-primary);
+      margin-bottom: 8px; letter-spacing: -0.5px;
+    }
+    .newtab-clock {
+      font-size: 96px; font-weight: 200; color: var(--text-primary);
+      letter-spacing: -4px; line-height: 1;
+      background: var(--gradient-accent);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .newtab-date {
+      font-size: 15px; color: var(--text-secondary); margin-top: 12px;
+      text-transform: capitalize; font-weight: 400;
+    }
+    .newtab-search { width: 100%; max-width: 620px; position: relative; }
+    .newtab-search input {
+      width: 100%; padding: 16px 24px 16px 56px;
+      background: var(--bg-tertiary);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-full); color: var(--text-primary);
+      font-size: 15px; outline: none; font-family: inherit;
+      transition: all var(--transition-normal);
+      box-shadow: var(--shadow-sm);
+    }
+    .newtab-search input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-glow), var(--shadow-md);
+      background: var(--bg-elevated);
+    }
+    .newtab-search input::placeholder { color: var(--text-muted); }
+    .newtab-search-icon { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+    .newtab-search-icon svg { width: 20px; height: 20px; }
+    .newtab-shortcuts {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 110px));
+      gap: 12px; justify-content: center; max-width: 700px; width: 100%;
+    }
+    .newtab-shortcut {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 20px 12px; border-radius: var(--radius-md); cursor: pointer;
+      transition: all var(--transition-normal);
+      background: transparent; border: 1px solid transparent;
+      color: inherit; font-family: inherit;
+    }
+    .newtab-shortcut:hover {
+      background: rgba(255,255,255,0.04);
+      border-color: var(--border);
+      transform: translateY(-2px);
+    }
+    .newtab-shortcut:active { transform: translateY(0) scale(0.98); }
+    .newtab-shortcut-icon {
+      width: 56px; height: 56px; border-radius: var(--radius-md);
+      background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center;
+      transition: all var(--transition-normal);
+      box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+    }
+    .newtab-shortcut:hover .newtab-shortcut-icon {
+      background: var(--accent-subtle);
+      border-color: var(--accent);
+      box-shadow: var(--shadow-glow);
+      transform: scale(1.05);
+    }
+    .newtab-shortcut-icon img { width: 28px; height: 28px; border-radius: var(--radius-xs); }
+    .newtab-shortcut-label {
+      font-size: 12px; color: var(--text-secondary); text-align: center;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px;
+      font-weight: 400;
+    }
+    .newtab-shortcut:hover .newtab-shortcut-label { color: var(--text-primary); }
+    .newtab-add-shortcut {
+      border: 2px dashed var(--border);
+      background: transparent;
+    }
+    .newtab-add-shortcut .newtab-shortcut-icon {
+      background: transparent; border: none; box-shadow: none;
+      color: var(--text-muted);
+    }
+    .newtab-add-shortcut:hover { border-color: var(--accent); }
+    .newtab-add-shortcut:hover .newtab-shortcut-icon { color: var(--accent); background: transparent; transform: none; }
+    /* History Page */
+    .history-page { display: none; flex-direction: column; height: 100%; }
+    .history-page.active { display: flex; }
+    .history-header {
+      padding: 28px 48px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 20px;
+      position: sticky; top: 0; background: rgba(13,13,15,0.92);
+      backdrop-filter: blur(16px); z-index: 10;
+    }
+    .history-header h1 {
+      font-size: 24px; font-weight: 500;
+      background: var(--gradient-accent);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .history-search {
+      margin-left: auto; background: var(--bg-tertiary); border: 1px solid var(--border);
+      color: var(--text-primary); padding: 9px 16px; border-radius: var(--radius-full);
+      font-size: 13px; outline: none; width: 280px; font-family: inherit;
+      transition: all var(--transition-fast);
+    }
+    .history-search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .history-content { padding: 24px 48px; overflow-y: auto; flex: 1; }
+    .history-day-header {
+      font-size: 13px; font-weight: 600; color: var(--text-muted);
+      padding: 16px 0 10px; border-bottom: 1px solid var(--border);
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .history-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 10px 14px; border-radius: var(--radius-sm);
+      cursor: pointer; transition: all var(--transition-fast);
+      margin-bottom: 2px;
+    }
+    .history-item:hover { background: rgba(255,255,255,0.03); }
+    .history-item-icon { width: 20px; height: 20px; border-radius: var(--radius-xs); flex-shrink: 0; }
+    .history-item-title {
+      flex: 1; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; color: var(--text-primary); font-weight: 400;
+    }
+    .history-item-url {
+      font-size: 12px; color: var(--text-muted); max-width: 320px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .history-item-time { font-size: 12px; color: var(--text-muted); flex-shrink: 0; min-width: 50px; text-align: right; }
+    .history-item-delete {
+      opacity: 0; background: transparent; border: none; color: var(--text-muted);
+      cursor: pointer; padding: 4px; border-radius: var(--radius-xs); display: flex;
+      transition: all var(--transition-fast);
+    }
+    .history-item:hover .history-item-delete { opacity: 1; }
+    .history-item-delete:hover { color: var(--danger); background: var(--danger-glow); }
+    .history-item-delete svg { width: 14px; height: 14px; }
+    .history-empty {
+      text-align: center; color: var(--text-muted); padding: 80px 0;
+      font-size: 15px; display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+    .history-empty svg { width: 64px; height: 64px; color: var(--border-strong); }
+    .history-clear-btn {
+      background: transparent; border: 1px solid var(--danger);
+      color: var(--danger); padding: 8px 16px; border-radius: var(--radius-sm);
+      font-size: 13px; cursor: pointer; transition: all var(--transition-fast);
+      font-family: inherit; font-weight: 500;
+    }
+    .history-clear-btn:hover { background: var(--danger-glow); }
+    /* Downloads Panel */
+    #downloads-panel {
+      position: fixed; bottom: 0; right: 20px;
+      width: 360px; max-height: 400px;
+      background: var(--bg-elevated); border: 1px solid var(--border-strong);
+      border-bottom: none; border-radius: var(--radius-md) var(--radius-md) 0 0;
+      box-shadow: var(--shadow-lg); z-index: 500;
+      display: none; flex-direction: column;
+      animation: slideUp 0.25s ease-out;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    #downloads-panel.visible { display: flex; }
+    .downloads-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+    }
+    .downloads-header h3 { font-size: 14px; font-weight: 500; }
+    .downloads-close {
+      background: transparent; border: none; color: var(--text-muted);
+      cursor: pointer; padding: 4px; border-radius: var(--radius-xs);
+      display: flex; transition: all var(--transition-fast);
+    }
+    .downloads-close:hover { color: var(--text-primary); background: rgba(255,255,255,0.06); }
+    .downloads-close svg { width: 16px; height: 16px; }
+    .downloads-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .download-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px; border-radius: var(--radius-sm);
+      transition: all 0.15s ease; border: 1px solid transparent;
+    }
+    .download-item:hover { 
+      background: rgba(255,255,255,0.06); 
+      border-color: var(--accent-subtle); 
+      transform: translateY(-1px); 
+      box-shadow: var(--shadow-sm); 
+    }
+    .download-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; color: var(--accent); }
+    .download-info { flex: 1; min-width: 0; }
+    .download-name { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .download-status { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .download-progress { height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+    .download-progress-bar { height: 100%; background: var(--gradient-accent); border-radius: 2px; transition: width 0.2s; }
+    .downloads-empty { padding: 32px; text-align: center; color: var(--text-muted); font-size: 13px; }
+    /* Settings Page */
+    .settings-page { display: none; flex-direction: column; background: var(--bg-primary); height: 100%; }
+    .settings-page.active { display: flex; }
+    .settings-header {
+      padding: 28px 48px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border); position: sticky; top: 0;
+      background: rgba(13,13,15,0.92); backdrop-filter: blur(16px); z-index: 10;
+    }
+    .settings-title { display: flex; align-items: center; gap: 16px; }
+    .settings-title img { width: 36px; height: 36px; border-radius: var(--radius-sm); }
+    .settings-title-text { display: flex; flex-direction: column; gap: 2px; }
+    .settings-title-text strong {
+      font-size: 22px; font-weight: 500;
+      background: var(--gradient-accent);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .settings-title-text span { font-size: 12px; color: var(--text-secondary); }
+    .settings-status {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border-radius: var(--radius-full);
+      background: rgba(74, 222, 128, 0.1); color: var(--success);
+      font-size: 12px; font-weight: 500; transition: opacity 0.3s;
+    }
+    .settings-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+    .settings-content {
+      padding: 36px 48px; display: flex; flex-direction: column; gap: 28px;
+      max-width: 760px; margin: 0 auto; width: 100%; overflow-y: auto; flex: 1;
+    }
+    .settings-card {
+      background: var(--bg-tertiary); border-radius: var(--radius-md);
+      padding: 24px; border: 1px solid var(--border);
+      transition: border-color var(--transition-fast);
+    }
+    .settings-card:hover { border-color: var(--border-strong); }
+    .settings-section-head h2 {
+      margin: 0 0 4px; font-size: 16px; font-weight: 500;
+      color: var(--text-primary);
+    }
+    .settings-microcopy { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.5; }
+    .settings-grid { display: flex; flex-direction: column; gap: 16px; }
+    .settings-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .settings-field { display: flex; flex-direction: column; gap: 8px; }
+    .settings-field label { font-size: 12px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; }
+    .settings-input, .settings-select {
+      background: var(--bg-primary); border: 1px solid var(--border);
+      color: var(--text-primary); padding: 10px 14px;
+      border-radius: var(--radius-sm); font-size: 13px;
+      outline: none; font-family: inherit;
+      transition: all var(--transition-fast);
+    }
+    .settings-input:focus, .settings-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .settings-select { cursor: pointer; }
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0; border-top: 1px solid var(--border);
+    }
+    .toggle-row:first-of-type { border-top: none; padding-top: 0; }
+    .toggle-row span { font-size: 14px; }
+    .toggle {
+      appearance: none; width: 44px; height: 24px; border-radius: 12px;
+      background: var(--bg-primary); border: 2px solid var(--border-strong);
+      position: relative; cursor: pointer; outline: none;
+      transition: all var(--transition-normal); flex-shrink: 0;
+    }
+    .toggle::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 16px; height: 16px; border-radius: 50%; background: var(--text-muted);
+      transition: all var(--transition-normal);
+    }
+    .toggle:checked { background: var(--accent); border-color: var(--accent); }
+    .toggle:checked::after { transform: translateX(20px); background: #fff; }
+    #settings-bookmarks-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .settings-bookmark-item {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--bg-primary); padding: 10px 14px;
+      border-radius: var(--radius-sm); border: 1px solid var(--border);
+      transition: border-color var(--transition-fast);
+    }
+    .settings-bookmark-item:hover { border-color: var(--border-strong); }
+    .settings-bookmark-item input {
+      flex: 1; border: none; background: transparent;
+      color: var(--text-primary); font-size: 13px; outline: none; font-family: inherit;
+    }
+    .settings-bookmark-item .split { width: 1px; height: 16px; background: var(--border-strong); }
+    .settings-bookmark-icon { width: 18px; height: 18px; border-radius: var(--radius-xs); flex-shrink: 0; }
+    .settings-remove-btn {
+      background: transparent; border: 1px solid var(--danger);
+      color: var(--danger); cursor: pointer; padding: 4px 10px;
+      border-radius: var(--radius-xs); font-size: 11px; font-family: inherit;
+      font-weight: 500; transition: all var(--transition-fast);
+    }
+    .settings-remove-btn:hover { background: var(--danger-glow); }
+    .settings-btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .settings-btn {
+      background: transparent; border: 1px solid var(--border-strong);
+      color: var(--text-primary); padding: 9px 18px;
+      border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all var(--transition-fast); font-family: inherit;
+    }
+    .settings-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .settings-btn.primary {
+      background: var(--gradient-accent); color: #fff;
+      border: none; box-shadow: var(--shadow-sm);
+    }
+    .settings-btn.primary:hover { box-shadow: var(--shadow-glow); transform: translateY(-1px); }
+    .settings-btn.danger { border-color: var(--danger); color: var(--danger); }
+    .settings-btn.danger:hover { background: var(--danger-glow); }
+    /* Responsive */
+    @media (max-width: 720px) {
+      .settings-content, .history-content, .history-header { padding-left: 24px; padding-right: 24px; }
+      .newtab-clock { font-size: 56px; letter-spacing: -2px; }
+      .newtab-greeting { font-size: 24px; }
+      .settings-row { grid-template-columns: 1fr; }
+    }
+    /* Incognito Mode */
+    body.incognito { --bg-primary: #0a0a0a; --bg-secondary: #121212; --bg-tertiary: #1a1a1a; --bg-tab-bar: #050505; --accent: #a78bfa; }
+    body.incognito .newtab-clock { background: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%); -webkit-background-clip: text; }
+    /* Tooltip */
+    [data-tooltip] { position: relative; }
+    [data-tooltip]::after {
+      content: attr(data-tooltip); position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%) scale(0.9); padding: 6px 10px;
+      background: var(--bg-elevated); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-xs); font-size: 11px; color: var(--text-primary);
+      white-space: nowrap; opacity: 0; pointer-events: none;
+      transition: all var(--transition-fast); z-index: 1000;
+    }
+    [data-tooltip]:hover::after { opacity: 1; transform: translateX(-50%) scale(1); }
+  </style>
+</head>
+<body>
+  <div id="tab-bar">
+    <div id="tabs-container"></div>
+    <button id="new-tab" title="Новая вкладка (Ctrl+T)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    </button>
+    <div class="drag-region"></div>
+  </div>
+  <div id="nav-bar">
+    <button class="nav-btn" id="btn-back" title="Назад (Alt+←)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+    <button class="nav-btn" id="btn-forward" title="Вперёд (Alt+→)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+    <button class="nav-btn" id="btn-refresh" title="Обновить (F5)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+    </button>
+    <button class="nav-btn" id="btn-home" title="Домашняя страница">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    </button>
+    <div id="url-bar-container">
+      <div id="ssl-icon" class="internal" title="Страница браузера">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+      </div>
+      <input type="text" id="url-input" placeholder="Поиск в интернете или введите URL..." autocomplete="off" spellcheck="false" />
+    </div>
+    <button class="nav-btn" id="btn-bookmark" title="Добавить в закладки (Ctrl+D)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+    </button>
+    <button class="nav-btn" id="btn-downloads" title="Загрузки">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+    </button>
+    <div style="position: relative;">
+      <button class="nav-btn" id="btn-menu" title="Меню">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></svg>
+      </button>
+      <div id="browser-menu" class="hidden">
+        <div class="menu-item" id="menu-new-tab">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></span>
+          Новая вкладка <span class="menu-shortcut">Ctrl+T</span>
+        </div>
+        <div class="menu-item" id="menu-incognito">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"></path></svg></span>
+          Режим инкогнито <span class="menu-shortcut">Ctrl+Shift+N</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" id="menu-history">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></span>
+          История <span class="menu-shortcut">Ctrl+H</span>
+        </div>
+        <div class="menu-item" id="menu-downloads">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></span>
+          Загрузки <span class="menu-shortcut">Ctrl+J</span>
+        </div>
+        <div class="menu-item" id="menu-bookmarks-toggle">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg></span>
+          Панель закладок <span class="menu-shortcut">Ctrl+Shift+B</span>
+        </div>
+        <div class="menu-item" id="menu-bookmark-page">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg></span>
+          Добавить в закладки <span class="menu-shortcut">Ctrl+D</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-zoom-controls">
+          <span style="flex: 1; font-size: 13px;">Масштаб</span>
+          <button class="menu-zoom-btn" id="menu-zoom-out" title="Уменьшить">−</button>
+          <span class="menu-zoom-level" id="menu-zoom-level">100%</span>
+          <button class="menu-zoom-btn" id="menu-zoom-in" title="Увеличить">+</button>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" id="menu-find">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
+          Найти на странице <span class="menu-shortcut">Ctrl+F</span>
+        </div>
+        <div class="menu-item" id="menu-save-page">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></span>
+          Сохранить страницу <span class="menu-shortcut">Ctrl+S</span>
+        </div>
+        <div class="menu-item" id="menu-fullscreen">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg></span>
+          Полный экран <span class="menu-shortcut">F11</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" id="menu-settings">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
+          Настройки <span class="menu-shortcut">Ctrl+,</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" id="menu-close" style="color: var(--danger);">
+          <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></span>
+          Закрыть браузер
+        </div>
+      </div>
+    </div>
+    <div id="loading-bar" class="hidden"></div>
+  </div>
+  <div id="bookmarks-bar"></div>
+  <div id="find-bar">
+    <input type="text" id="find-input" placeholder="Найти на странице..." autocomplete="off" />
+    <span id="find-count">0 / 0</span>
+    <button class="find-btn" id="find-prev" title="Предыдущий (Shift+Enter)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+    </button>
+    <button class="find-btn" id="find-next" title="Следующий (Enter)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </button>
+    <button class="find-btn" id="find-close" title="Закрыть (Esc)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+  </div>
+  <div id="context-menu-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999; background: transparent;"></div>
+  <div class="context-menu" id="tab-context-menu" style="z-index: 10000;">
+    <div class="ctx-item" data-action="reload">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+      Обновить вкладку
+    </div>
+    <div class="ctx-item" data-action="duplicate">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      Дублировать вкладку
+    </div>
+    <div class="ctx-item" data-action="pin">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L12 12"></path><circle cx="12" cy="17" r="5"></circle></svg>
+      <span class="ctx-pin-text">Закрепить вкладку</span>
+    </div>
+    <div class="ctx-item" data-action="mute">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+      <span class="ctx-mute-text">Отключить звук</span>
+    </div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="close">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      Закрыть вкладку
+    </div>
+    <div class="ctx-item" data-action="close-others">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>
+      Закрыть другие вкладки
+    </div>
+    <div class="ctx-item" data-action="close-right">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      Закрыть вкладки справа
+    </div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="reopen">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+      Открыть закрытую <span class="ctx-shortcut">Ctrl+Shift+T</span>
+    </div>
+  </div>
+  <div class="context-menu" id="page-context-menu" style="z-index: 10000;">
+    <div class="ctx-item" data-action="back">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      Назад
+    </div>
+    <div class="ctx-item" data-action="forward">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      Вперёд
+    </div>
+    <div class="ctx-item" data-action="reload">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+      Обновить
+    </div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="open-link" id="page-ctx-open-link">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07L11 5"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07L13 19"></path></svg>
+      Открыть ссылку в новой вкладке
+    </div>
+    <div class="ctx-item" data-action="copy-link" id="page-ctx-copy-link">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      Копировать адрес ссылки
+    </div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="save-image" id="page-ctx-save-image">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+      Сохранить картинку как...
+    </div>
+    <div class="ctx-item" data-action="copy-image" id="page-ctx-copy-image">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      Копировать URL картинки
+    </div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item" data-action="save-page">
+      <svg class="ctx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+      Сохранить страницу как...
+    </div>
+  </div>
+  <div id="zoom-indicator">100%</div>
+  <div id="downloads-panel">
+    <div class="downloads-header">
+      <h3>Загрузки</h3>
+      <button class="downloads-close" id="downloads-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="downloads-list" id="downloads-list">
+      <div class="downloads-empty">Нет активных загрузок</div>
+    </div>
+  </div>
+  <div id="view-container"></div>
+  <script src="renderer.js"></script>
+</body>
+</html>
